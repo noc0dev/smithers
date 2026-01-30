@@ -70,7 +70,7 @@ Then copy the `smithers-worker` agent from SKILL.md to `~/.claude/agents/`.
 
 ## See Also
 
-- [Ralph Wiggum](https://ghuntley.com/ralph/) - Depth-first iteration (single task loops)
+- [Ralph Wiggum](https://github.com/anthropics/claude-code/blob/main/plugins/ralph-wiggum/README.md) - Depth-first iteration (single task loops)
 - Smithers is breadth-first (parallel tasks, review gating)
 
 ## License
