@@ -5,7 +5,7 @@
 <h1 align="center">smithers</h1>
 
 <p align="center">
-  <strong>Parallel autonomous implementation for coding agents. You review polished PRs, not works-in-progress.</strong>
+  <strong>Ralph loops. Smithers parallelizes.</strong>
 </p>
 
 <p align="center">
