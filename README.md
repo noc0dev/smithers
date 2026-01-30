@@ -34,8 +34,8 @@ You: "Okay NOW I'll look at it"
 ## The Solution
 
 ```
-You: "/smithers"
-Smithers: "3 ready beads found. Dispatch?"
+You: "implement login, fix the navbar, and add API tests"
+Smithers: "3 tasks parsed. Dispatch?"
 You: "y"
 *walks away*
 Smithers: "All PRs ready for review:"
@@ -56,13 +56,31 @@ Then copy the `smithers-worker` agent from SKILL.md to `~/.claude/agents/`.
 
 ## Requirements
 
-- [beads](https://github.com/steveyegge/beads) - Issue tracker
 - [gh](https://cli.github.com/) - GitHub CLI
-- Automated PR reviewers (CodeRabbit, Codex, [roborev](https://github.com/wesm/roborev), etc.)
+- Git worktree support
+
+### Optional
+
+- [beads](https://github.com/steveyegge/beads) - Auto-detects ready tasks
+- [roborev](https://github.com/wesm/roborev) - Local code review
+- CodeRabbit, Codex - Org-level PR review bots
+
+## Usage
+
+```bash
+# Natural language
+"implement login and fix the navbar"
+
+# From GitHub issues
+/smithers --from-issues label:ready
+
+# From beads (auto-detected if bd CLI available)
+/smithers
+```
 
 ## How It Works
 
-1. Fetches ready tasks from beads
+1. Gets tasks (natural language, GitHub issues, or beads)
 2. Creates isolated git worktree per task
 3. Dispatches parallel workers to implement
 4. Polls every 60s until CI passes + reviews resolved
