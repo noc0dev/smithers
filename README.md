@@ -17,7 +17,7 @@
 
 ## The Problem
 
-You're tired of babysitting PRs:
+You want to knock out several tasks once, and are tired of baby sitting agents:
 
 ```
 You: "Implement this feature"
@@ -28,13 +28,13 @@ Agent: *pushes fix*
 CodeRabbit: "Missing error handling"
 You: "Address the review"
 Agent: *pushes fix*
-You: "Okay NOW I'll look at it"
+You: *switch to feature 2 and repeat*
 ```
 
 ## The Solution
 
 ```
-You: "implement login, fix the navbar, and add API tests"
+You: /smithers "implement login, fix the navbar, and add API tests"
 Smithers: "3 tasks parsed. Dispatch?"
 You: "y"
 *walks away*
@@ -61,7 +61,7 @@ Then copy the `smithers-worker` agent from SKILL.md to `~/.claude/agents/`.
 
 ### Optional
 
-- [beads](https://github.com/steveyegge/beads) - Auto-detects ready tasks
+- [beads](https://github.com/steveyegge/beads) - Dependency-aware issue tracker for agents
 - [roborev](https://github.com/wesm/roborev) - Local code review
 - CodeRabbit, Codex - Org-level PR review bots
 
@@ -69,7 +69,7 @@ Then copy the `smithers-worker` agent from SKILL.md to `~/.claude/agents/`.
 
 ```bash
 # Natural language
-"implement login and fix the navbar"
+/smithers "implement login and fix the navbar"
 
 # From GitHub issues
 /smithers --from-issues label:ready
