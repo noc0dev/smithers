@@ -75,8 +75,7 @@ digraph smithers {
   worktrees [label="Create worktrees"];
   dispatch [label="Dispatch agents"];
   pr [label="Create PR"];
-  poll [label="Poll every 60s"];
-  check [label="All PRs ready?"];
+  poll_check [label="Poll 60s / check ready"];
   fix [label="Dispatch fix"];
   present [label="Present to human"];
 
@@ -85,11 +84,10 @@ digraph smithers {
   confirm -> fetch [label="no"];
   worktrees -> dispatch;
   dispatch -> pr;
-  pr -> poll;
-  poll -> check;
-  check -> fix [label="CI fail or comments"];
-  fix -> poll;
-  check -> present [label="all clean"];
+  pr -> poll_check;
+  poll_check -> fix [label="CI fail or comments"];
+  fix -> poll_check;
+  poll_check -> present [label="all clean"];
 }
 ```
 
