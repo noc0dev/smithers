@@ -116,9 +116,25 @@ If you cannot complete the task, explain what's blocking you.
 
 Smithers takes a list of tasks, creates isolated worktrees, dispatches parallel subagents to implement each, handles automated PR reviews, and only presents PRs for human review after CI passes and all review comments are addressed.
 
-**Core principle:** Humans review polished PRs, not work-in-progress.
+**Core principles:**
+- **Humans review polished PRs, not work-in-progress**
+- **Workers use Ralph Loop pattern** - iterate until stop hooks (tests/lints/builds) pass
+- **Completion promise** - workers only exit when all validations pass
+- **Breadth-first parallelism** - multiple workers iterate independently
 
 **Announce at start:** "I'm using the smithers skill to dispatch parallel workers."
+
+## Architecture: Smithers vs Ralph
+
+| Aspect | Ralph | Smithers |
+|--------|-------|----------|
+| **Pattern** | Depth-first (one task, iterate until done) | Breadth-first (parallel tasks, review gating) |
+| **Loop Scope** | Single task, infinite bash loop | Multiple tasks, polling loop with gates |
+| **Worker Model** | Monolithic single process | Parallel isolated workers |
+| **Stop Hooks** | Tests/lints/builds block iteration | Tests/lints/builds + PR reviews block presentation |
+| **Completion** | Exit when tests pass | Exit when tests pass + reviews addressed |
+
+Smithers workers **internally use Ralph loop discipline** (iterate until stop hooks pass), but Smithers **orchestrates multiple Ralph loops in parallel** with review-based gating.
 
 ## When to Use
 
@@ -238,9 +254,17 @@ grep -q "^\.worktrees/" .gitignore || echo ".worktrees/" >> .gitignore
 git worktree add ".worktrees/<ID>" -b "feature/<ID>-<slug>"
 ```
 
-### Step 5: Dispatch Parallel Subagents
+### Step 5: Dispatch Parallel Subagents (Ralph Loop Workers)
 
 Launch one `smithers-worker` subagent per task in parallel.
+
+**Each worker operates a Ralph loop internally:**
+1. Implements feature increment (TDD)
+2. Runs stop hooks (tests, lints, builds)
+3. If hooks fail: fixes and repeats step 2
+4. If hooks pass: checks completion promise
+5. If complete: commits, pushes, creates PR
+6. If incomplete: returns to step 1
 
 **Dispatch command:**
 
@@ -252,11 +276,16 @@ Task(
 Working directory: .worktrees/<ID>
 Description: <Description>
 
-Return: PR URL, branch, test output, files changed, commit hash"
+Use Ralph loop pattern:
+- Iterate until all stop hooks pass (tests, lints, builds)
+- Fulfill completion promise before creating PR
+- Report when all validations satisfied
+
+Return: PR URL, branch, stop hook results, files changed, commit hash"
 )
 ```
 
-**Critical:** Use `subagent_type="smithers-worker"` - NOT `general-purpose`. The smithers-worker agent is configured with Write/Edit/Bash tools and acceptEdits permission mode.
+**Critical:** Use `subagent_type="smithers-worker"` - NOT `general-purpose`. The smithers-worker agent is configured with Write/Edit/Bash tools, acceptEdits permission mode, and Ralph loop discipline.
 
 ### Step 6: Monitor and Address Reviews (Polling Loop)
 
@@ -377,6 +406,8 @@ gh issue close <NUMBER> --reason completed
 | "Minor comment, human can handle" | Address ALL comments AND resolve threads first. |
 | "Skip worktree, use current dir" | Parallel agents corrupt git state. |
 | "User said go, skip the list" | ALWAYS confirm selection. |
+| "Worker committed with failing tests" | Ralph loop violation! Workers MUST iterate until stop hooks pass. |
+| "Good enough, ship it" | Completion promise not fulfilled. All validations must pass. |
 
 ## Failure Modes
 
@@ -398,3 +429,11 @@ gh issue close <NUMBER> --reason completed
 - [beads](https://github.com/steveyegge/beads) - Auto-detects ready tasks via `bd ready`
 - [roborev](https://github.com/wesm/roborev) - Local code review
 - CodeRabbit, Codex - Org-level PR review bots
+
+## See Also
+
+- [Ralph Wiggum](https://ghuntley.com/ralph/) - The depth-first iteration pattern that inspired smithers-worker
+- [How to Ralph Wiggum](https://github.com/ghuntley/how-to-ralph-wiggum) - Detailed guide on Ralph loop implementation
+- [Ralph Loop Resources](https://github.com/snwfdhmp/awesome-ralph) - Curated list of Ralph pattern resources
+
+**Relationship:** Smithers workers use Ralph loop internally (depth-first per task), while Smithers orchestrates multiple Ralph loops in parallel (breadth-first across tasks) with review-based gating.
