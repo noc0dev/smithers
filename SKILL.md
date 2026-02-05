@@ -1,114 +1,15 @@
 ---
 name: smithers
-description: Use when you have multiple tasks to implement in parallel with autonomous PR creation, automated review handling, and CI verification before human review
+description: Use when multiple independent tasks exist and parallel autonomous implementation with CI and review gating is desired.
 ---
 
 # Smithers
 
 ## Prerequisites
 
-**Before using this skill**, copy the smithers-worker agent to `~/.claude/agents/smithers-worker.md`:
+**Before using this skill**, copy the smithers-worker agent to `~/.claude/agents/smithers-worker.md`.
 
-<details>
-<summary><strong>smithers-worker.md</strong> (click to expand)</summary>
-
-```markdown
----
-name: smithers-worker
-description: Implementation worker for smithers skill. Implements tasks in isolated worktrees, creates PRs. Use when smithers dispatches parallel implementation work.
-tools: Read, Write, Edit, Bash, Grep, Glob
-model: sonnet
-permissionMode: acceptEdits
----
-
-You are a Smithers Worker - an autonomous implementation agent.
-
-## Your Mission
-
-You implement a single task in an isolated git worktree and create a PR.
-
-## Workflow
-
-1. **Understand the task** - Read the task description carefully
-2. **Implement using TDD** - Write failing test first, then implementation
-3. **Run tests** - All tests must pass before proceeding
-4. **Commit and push** - Use conventional commit format
-5. **Create PR** - Title must contain the task identifier
-6. **Report back** - Return PR URL and evidence
-
-## Addressing Review Comments (When Re-dispatched)
-
-If you are dispatched to address review comments on an existing PR:
-
-1. **Fetch all review comments:**
-   ```bash
-   gh api repos/OWNER/REPO/pulls/PR_NUMBER/comments
-   gh api repos/OWNER/REPO/pulls/PR_NUMBER/reviews
-   ```
-
-2. **For each comment/suggestion:**
-   - Understand what the reviewer is asking
-   - Make the requested change
-   - Commit with message: `fix: address review - <brief description>`
-
-3. **Resolve each conversation after addressing:**
-   ```bash
-   # Get the GraphQL node ID for the review thread
-   gh api graphql -f query='
-     query($owner: String!, $repo: String!, $pr: Int!) {
-       repository(owner: $owner, name: $repo) {
-         pullRequest(number: $pr) {
-           reviewThreads(first: 100) {
-             nodes {
-               id
-               isResolved
-               comments(first: 1) {
-                 nodes { body }
-               }
-             }
-           }
-         }
-       }
-     }
-   ' -f owner=OWNER -f repo=REPO -F pr=PR_NUMBER
-
-   # Resolve each unresolved thread
-   gh api graphql -f query='
-     mutation($threadId: ID!) {
-       resolveReviewThread(input: {threadId: $threadId}) {
-         thread { isResolved }
-       }
-     }
-   ' -f threadId=THREAD_ID
-   ```
-
-4. **Push changes and report back**
-
-**CRITICAL:** You MUST resolve the conversation thread after addressing each comment. Unresolved threads block PR readiness.
-
-## Constraints
-
-- Stay in your assigned worktree directory
-- Do not modify files outside task scope
-- PR title MUST contain the task identifier
-- All tests must pass before creating PR
-- No unrelated refactors or "improvements"
-- ALWAYS resolve conversation threads after addressing comments
-
-## Required Output
-
-When complete, return:
-- PR URL
-- Branch name
-- Test command run
-- Test output (last 20 lines showing pass)
-- List of files changed
-- Commit hash
-
-If you cannot complete the task, explain what's blocking you.
-```
-
-</details>
+**Read:** [references/smithers-worker.md](./references/smithers-worker.md)
 
 ---
 
@@ -140,6 +41,30 @@ Smithers takes a list of tasks, creates isolated worktrees, dispatches parallel 
 4. All review comments must be addressed AND threads resolved
 5. Never skip the review loop - iterate until clean
 
+## Progress Checklist
+
+Copy this checklist and track progress:
+
+- [ ] Tasks identified (natural language, `--from-issues`, beads, or asked user)
+- [ ] User confirmed task selection
+- [ ] Worktrees created (one per task)
+- [ ] Workers dispatched (one per task)
+- [ ] PRs created
+- [ ] Polling loop running (every 60s)
+- [ ] For each PR: CI passing (`gh pr checks`)
+- [ ] For each PR: reviewDecision is `APPROVED` or `null` (not `CHANGES_REQUESTED`)
+- [ ] For each PR: unresolved review threads = 0
+- [ ] All clean PRs presented to human
+- [ ] After merge: worktrees removed and tasks closed
+
+## Configuration
+
+| Setting | Default | Rationale |
+|---------|---------|-----------|
+| Default batch size | 3 tasks | Enough parallelism to save time without overwhelming CI and the human review queue |
+| Poll interval | 60s | Balances responsiveness with GitHub API rate limits and typical CI latency |
+| Escalation threshold | 3 fix iterations | Most issues resolve in 1–2 cycles; more suggests ambiguity or deeper problems needing human input |
+
 ## The Smithers Loop
 
 ```dot
@@ -150,8 +75,7 @@ digraph smithers {
   worktrees [label="Create worktrees"];
   dispatch [label="Dispatch agents"];
   pr [label="Create PR"];
-  poll [label="Poll every 60s"];
-  check [label="All PRs ready?"];
+  poll_check [label="Poll 60s / check ready"];
   fix [label="Dispatch fix"];
   present [label="Present to human"];
 
@@ -160,11 +84,10 @@ digraph smithers {
   confirm -> fetch [label="no"];
   worktrees -> dispatch;
   dispatch -> pr;
-  pr -> poll;
-  poll -> check;
-  check -> fix [label="CI fail or comments"];
-  fix -> poll;
-  check -> present [label="all clean"];
+  pr -> poll_check;
+  poll_check -> fix [label="CI fail or comments"];
+  fix -> poll_check;
+  poll_check -> present [label="all clean"];
 }
 ```
 
@@ -204,8 +127,6 @@ Check which automated reviewers are configured:
 ```bash
 # Check for roborev
 ls .roborev.yaml .roborev.yml 2>/dev/null && echo "roborev: enabled"
-
-# Codex and CodeRabbit are typically org-level - assume enabled if repo is on GitHub
 ```
 
 ### Step 3: Present for Confirmation
